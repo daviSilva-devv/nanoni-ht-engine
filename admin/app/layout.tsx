@@ -5,6 +5,7 @@ export const metadata = { title: "Nanoni Admin", description: "Nanoni control pl
 
 const links = [
   ["/", "Dashboard"],
+  ["/configuration", "Configuração"],
   ["/content", "Conteúdo"],
   ["/catalog", "Catálogo"],
   ["/commerce", "Vendas/Acessos"],

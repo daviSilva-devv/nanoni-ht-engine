@@ -139,6 +139,144 @@ class CopyVariantRead(ORMModel):
     active: bool
 
 
+class AdminConfigUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class NicheUpdate(AdminConfigUpdate):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    slug: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]*$")
+    description: str | None = None
+    active: bool | None = None
+    sort_order: int | None = None
+
+
+class MicroNicheUpdate(NicheUpdate):
+    niche_id: str | None = None
+
+
+class CommunityUpdate(AdminConfigUpdate):
+    niche_id: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    slug: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]*$")
+    description: str | None = None
+    active: bool | None = None
+
+
+class CommunityVersionUpdate(AdminConfigUpdate):
+    version: int | None = Field(default=None, ge=1)
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    promise_snapshot: dict[str, Any] | None = None
+    microniche_ids: list[str] | None = None
+    active_for_sale: bool | None = None
+
+
+class DestinationUpdate(AdminConfigUpdate):
+    community_id: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    destination_type: str | None = None
+    telegram_chat_id: str | None = None
+    username: str | None = None
+    status: str | None = None
+    replacement_destination_id: str | None = None
+    protected_content: bool | None = None
+
+
+class TopicUpdate(AdminConfigUpdate):
+    destination_id: str | None = None
+    microniche_id: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    role: str | None = None
+    message_thread_id: int | None = Field(default=None, ge=1)
+    active: bool | None = None
+
+
+class ProductUpdate(AdminConfigUpdate):
+    community_version_id: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    slug: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]*$")
+    description: str | None = None
+    active: bool | None = None
+
+
+class PricePlanUpdate(AdminConfigUpdate):
+    product_id: str | None = None
+    kind: str | None = None
+    amount: Decimal | None = Field(default=None, gt=0)
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
+    duration_days: int | None = Field(default=None, gt=0)
+    lifetime: bool | None = None
+    active: bool | None = None
+    featured: bool | None = None
+    sort_order: int | None = None
+
+
+class OfferProductInput(BaseModel):
+    product_id: str
+    role: str = Field(default="TARGET", min_length=1, max_length=24)
+
+
+class OfferConditionInput(BaseModel):
+    condition_type: str = Field(min_length=1, max_length=64)
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class OfferCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    kind: str
+    active: bool = True
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    config: dict[str, Any] = Field(default_factory=dict)
+    products: list[OfferProductInput] = Field(default_factory=list)
+    conditions: list[OfferConditionInput] = Field(default_factory=list)
+
+
+class OfferUpdate(AdminConfigUpdate):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    kind: str | None = None
+    active: bool | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    config: dict[str, Any] | None = None
+    products: list[OfferProductInput] | None = None
+    conditions: list[OfferConditionInput] | None = None
+
+
+class CopySlotCreate(BaseModel):
+    key: str = Field(pattern=r"^[A-Z0-9][A-Z0-9_]*$", max_length=64)
+    description: str | None = None
+    active: bool = True
+
+
+class CopySlotUpdate(AdminConfigUpdate):
+    key: str | None = Field(default=None, pattern=r"^[A-Z0-9][A-Z0-9_]*$", max_length=64)
+    description: str | None = None
+    active: bool | None = None
+
+
+class CopyVariantAdminCreate(BaseModel):
+    slot_id: str
+    product_id: str | None = None
+    text: str = Field(min_length=1)
+    media_asset_id: str | None = None
+    weight: int = Field(default=10, ge=1, le=1000)
+    active: bool = True
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+
+
+class CopyVariantUpdate(AdminConfigUpdate):
+    slot_id: str | None = None
+    product_id: str | None = None
+    text: str | None = Field(default=None, min_length=1)
+    media_asset_id: str | None = None
+    weight: int | None = Field(default=None, ge=1, le=1000)
+    active: bool | None = None
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+
+
 class SourceCreate(BaseModel):
     name: str
     adapter: str

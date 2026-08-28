@@ -3,7 +3,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from nanoni.api.routers import catalog, commerce, content, dashboard, jobs, publication, system
+from nanoni.api.routers import (
+    admin_config,
+    catalog,
+    commerce,
+    content,
+    dashboard,
+    jobs,
+    publication,
+    system,
+)
 from nanoni.core.logging import configure_logging
 
 
@@ -28,6 +37,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(system.router)
+    app.include_router(admin_config.router, prefix="/api/v1")
     app.include_router(dashboard.router, prefix="/api/v1")
     app.include_router(catalog.router, prefix="/api/v1")
     app.include_router(content.router, prefix="/api/v1")

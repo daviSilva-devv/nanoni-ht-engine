@@ -1,0 +1,20 @@
+NANONI ENGINE BASE — VALIDATION
+
+Validated in the build environment:
+
+[PASS] Backend pytest suite: 16 tests.
+[PASS] Fresh Alembic upgrade from empty SQLite database.
+[PASS] `alembic check`: no pending schema operations.
+[PASS] Python compileall for src + tests.
+[PASS] FastAPI smoke: fresh DB -> migrate -> demo seed -> server -> /health -> authenticated dashboard.
+[PASS] Helper JavaScript syntax via `node --check`.
+[PASS] Domain metadata contains 50 tables.
+
+Not claimed as validated here:
+
+[NOT RUN] Full Next.js build: npm dependency download timed out in this sandbox. The admin shell source/package is included, but run `npm install && npm run build` on a machine with npm registry access before treating frontend build as green.
+[NOT INCLUDED] Real production payment provider credentials/provider implementation.
+[NOT INCLUDED] Real Telegram publisher/access executor.
+[NOT INCLUDED] Protected-content bypass logic.
+
+This distinction is intentional: the repository should never label an unimplemented external integration as finished.

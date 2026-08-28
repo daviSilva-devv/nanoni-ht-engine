@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Nanoni Collector Helper",
+  "version": "0.2.0",
+  "description": "Sends Telegram Web post context and user-authorized local imports to the Nanoni collector.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": ["https://web.telegram.org/*", "http://127.0.0.1:8010/*", "http://localhost:8010/*"],
+  "action": {"default_popup": "popup.html"},
+  "content_scripts": [
+    {"matches": ["https://web.telegram.org/*"], "js": ["content.js"], "run_at": "document_idle"}
+  ]
+}

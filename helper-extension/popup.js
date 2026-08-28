@@ -1,0 +1,6 @@
+const $=id=>document.getElementById(id);
+async function load(){const c=await chrome.storage.local.get(["backend","source","secret"]);$("backend").value=c.backend||"http://127.0.0.1:8010";$("source").value=c.source||"";$("secret").value=c.secret||"";}
+$("save").onclick=async()=>{await chrome.storage.local.set({backend:$("backend").value,source:$("source").value,secret:$("secret").value});$("status").textContent="Config salva.";};
+async function sign(secret,text){const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);const sig=await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(text));return [...new Uint8Array(sig)].map(b=>b.toString(16).padStart(2,"0")).join("");}
+$("send").onclick=async()=>{try{const [tab]=await chrome.tabs.query({active:true,currentWindow:true});const manifest=await chrome.tabs.sendMessage(tab.id,{type:"NANONI_CONTEXT"});const body=JSON.stringify({source_id:$("source").value,manifest});const signature=await sign($("secret").value,body);const r=await fetch(`${$("backend").value}/api/v1/content/helper/manifest`,{method:"POST",headers:{"Content-Type":"application/json","X-Nanoni-Signature":signature},body});$("status").textContent=r.ok?`Importado: ${(await r.json()).id}`:`Erro ${r.status}: ${await r.text()}`;}catch(e){$("status").textContent=String(e);}};
+load();

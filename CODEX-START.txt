@@ -1,0 +1,12 @@
+NANONI ENGINE — START HERE
+
+1) Read docs/BASE-OFICIAL.md and docs/CODEX-RULES.md completely.
+2) Run the existing tests before changing code.
+3) Implement ONLY the requested phase from docs/IMPLEMENTATION-PLAN.md.
+4) Do not replace generic entities with hardcoded product/niche names.
+5) Preserve the split between payment, entitlement and Telegram membership.
+6) Any unrequested improvement goes to docs/BACKLOG.md.
+7) Finish each phase with tests and a concise gate report.
+
+Current repository state: foundation executable + domain/admin API + mock commerce/access flow + content contracts.
+The real external integrations remain behind interfaces and feature flags on purpose.

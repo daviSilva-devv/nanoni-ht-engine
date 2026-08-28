@@ -1,0 +1,3 @@
+import {api} from "../../lib/api";
+type Ent={id:string;product_id:string;status:string;expires_at:string|null};
+export default async function Commerce(){const ent=await api<Ent[]>("/api/v1/commerce/entitlements");return <><div className="eyebrow">Payment + Access</div><h1 className="title">Vendas e acessos</h1><div className="card"><h2>Entitlements</h2><p className="muted">Pagamento e membership permanecem separados por desenho.</p>{ent?.length?<table className="table"><thead><tr><th>Produto</th><th>Status</th><th>Expira</th></tr></thead><tbody>{ent.map(e=><tr key={e.id}><td>{e.product_id}</td><td>{e.status}</td><td>{e.expires_at??"Lifetime"}</td></tr>)}</tbody></table>:<div className="empty">Nenhum acesso criado.</div>}</div></>}

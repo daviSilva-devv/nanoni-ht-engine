@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+*.egg-info/
+.coverage
+htmlcov/
+dist/
+*.db
+*.sqlite3
+
+# Node
+node_modules/
+.next/
+npm-debug.log*
+
+# Runtime
+.env
+runtime/
+media/
+logs/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

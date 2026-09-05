@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     external_checkout_base_url: str = "http://localhost:3000/checkout"
     telegram_bot_token: str = ""
     telegram_api_base_url: str = "https://api.telegram.org"
+    telegram_local_api_base_url: str = ""
+    telegram_vault_chat_id: str = ""
+    telegram_bot_api_max_upload_bytes: int = 50_000_000
 
     @model_validator(mode="after")
     def resolve_project_paths(self) -> "Settings":

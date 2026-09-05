@@ -414,6 +414,10 @@ class MediaAssetRead(ORMModel):
     file_size: int | None
     size: int | None = Field(validation_alias="file_size")
     sha256: str | None
+    telegram_file_id: str | None
+    telegram_file_unique_id: str | None
+    vault_chat_id: str | None
+    vault_message_id: str | None
     status: str
     metadata_json: dict[str, Any]
 

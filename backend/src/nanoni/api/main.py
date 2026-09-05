@@ -12,6 +12,7 @@ from nanoni.api.routers import (
     jobs,
     publication,
     system,
+    vault,
 )
 from nanoni.core.logging import configure_logging
 
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(publication.router, prefix="/api/v1")
     app.include_router(commerce.router, prefix="/api/v1")
     app.include_router(jobs.router, prefix="/api/v1")
+    app.include_router(vault.router, prefix="/api/v1")
     return app
 
 

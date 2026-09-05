@@ -307,6 +307,7 @@ class MediaAsset(TimestampMixin, Base):
     sha256: Mapped[str | None] = mapped_column(String(64), index=True)
     telegram_file_id: Mapped[str | None] = mapped_column(Text)
     telegram_file_unique_id: Mapped[str | None] = mapped_column(String(255), index=True)
+    vault_chat_id: Mapped[str | None] = mapped_column(String(64), index=True)
     vault_message_id: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(24), default=AssetStatus.DISCOVERED)
     metadata_json: Mapped[dict] = mapped_column(SAJSON, default=dict)

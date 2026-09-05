@@ -1,26 +1,32 @@
 CURRENT_PHASE: 4A
-STATUS: READY
-BASE_COMMIT: d27117e
+STATUS: GREEN_DETERMINISTIC
+AGENT: Claude Code
+BASE_COMMIT: 857c2f9
 LAST_GREEN_PHASE: 3
-LAST_GREEN_COMMIT: phase-3-green
-CURRENT_WORK: Phase 3 Erome source integration is complete; Phase 4A Telegram Vault is next.
+LAST_GREEN_COMMIT: 857c2f9
+CURRENT_WORK: Telegram Vault + Media Gateway
+BLOCKERS: Telegram real credentials unavailable
+BLOCKED_EXTERNAL: Telegram credentials / Vault destination required for real gate.
+NEXT: Run the real Telegram gate once credentials + vault chat are configured, then declare Phase 4A fully GREEN and proceed to Phase 4B.
 
 DONE:
-- Phase 3A public Erome inspect/import, SSRF validation, selective async acquisition, retry and SHA256 dedupe.
-- Phase 3B admin workflow and deterministic Edge E2E, including zero-download inspect and persistence regression.
-- Final gates: 54 backend tests passed (1 known PostgreSQL skip), Ruff, compileall, Alembic check and Next.js production build green.
+- TelegramMediaGateway: HTTPX streaming upload with progress callback, retry/backoff on 429 + 5xx, honours retry_after.
+- Normal Bot API vs Local Bot API selection driven by configured upload-size limit (NANONI_TELEGRAM_BOT_API_MAX_UPLOAD_BYTES); Local API required error when file exceeds limit and no local URL set.
+- Vault persistence: upload_asset_to_vault writes telegram_file_id, telegram_file_unique_id, vault_chat_id, vault_message_id on MediaAsset and a verified VaultObject row; asset -> VAULTED.
+- Idempotency: enqueue_pack_vault_uploads dedupes by idempotency_key upload-vault:<asset>:<chat> and skips already-vaulted assets; upload_asset_to_vault is a no-op when a verified VaultObject already exists.
+- Job handler UPLOAD_VAULT in worker with progress persisted to job.payload (bytes_sent/total_bytes), gateway always closed, asset -> FAILED on error with re-raise for retry.
+- Restart recovery: engine.recover_stale requeues RUNNING jobs whose lock is older than stale_after; run_once calls it before claim_next.
+- Local file is never deleted before a safe confirmation (asserted by tests).
+- Admin endpoints: POST /api/v1/vault/packs/{pack_id}, GET /api/v1/vault/assets/{asset_id}; require_admin enforced; vault chat id comes from settings, never hardcoded.
+- Migration bd14ac8e712f adds media_assets.vault_chat_id (+ index); down_revision 9c7a2e41f5b8.
+- .env.example: NANONI_TELEGRAM_LOCAL_API_BASE_URL, NANONI_TELEGRAM_VAULT_CHAT_ID, NANONI_TELEGRAM_BOT_API_MAX_UPLOAD_BYTES.
 
-TODO:
-- Implement Phase 4A Telegram Vault boundary, persistence and deterministic tests.
-- Run the real Telegram gate when credentials are available.
-
-BLOCKERS:
-- None for deterministic Phase 4A implementation; real Telegram validation may require external credentials.
-
-NEXT:
-- Audit the existing Telegram boundary and implement Phase 4A from the current main branch.
+DETERMINISTIC_GATES (all GREEN):
+- pytest backend: 60 passed, 1 skipped (Postgres env gate), incl. tests/test_telegram_vault.py (6).
+- ruff check src tests: clean.
+- python -m compileall src: clean.
+- alembic upgrade head: clean; alembic check: no new upgrade operations.
 
 IMPORTANT_NOTES:
-- The original reference Erome URL returns HTTP 410; a current public replacement was inspected successfully with 15 items.
-- Phase 3 introduced no migration or dependency.
-- PostgreSQL Phase 2 schema gate was already validated and no related schema changed in Phase 3.
+- Phase 4A is backend-only; no frontend changes, Next.js build gate not re-run.
+- Real Telegram upload path unverified: no bot token / vault chat configured. This is an external blocker, not an implementation failure.

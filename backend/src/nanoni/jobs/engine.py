@@ -63,6 +63,34 @@ def claim_next(db: Session, worker_id: str, *, now: datetime | None = None) -> J
     return job
 
 
+def recover_stale(
+    db: Session,
+    *,
+    now: datetime | None = None,
+    stale_after: timedelta = timedelta(minutes=15),
+) -> int:
+    now = now or datetime.now(UTC)
+    jobs = list(
+        db.scalars(
+            select(Job).where(
+                Job.status == JobStatus.RUNNING,
+                Job.locked_at.is_not(None),
+                Job.locked_at <= now - stale_after,
+            )
+        )
+    )
+    for job in jobs:
+        job.status = JobStatus.QUEUED
+        job.run_after = now
+        job.locked_at = None
+        job.lock_owner = None
+        job.last_error = "recovered stale worker lock"
+        db.add(job)
+    if jobs:
+        db.flush()
+    return len(jobs)
+
+
 def succeed(db: Session, job: Job) -> None:
     ensure_transition(JobStatus, job.status, JobStatus.SUCCEEDED)
     job.status = JobStatus.SUCCEEDED

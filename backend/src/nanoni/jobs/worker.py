@@ -11,7 +11,9 @@ from nanoni.domain.models import Job, MediaAsset, PackItem
 from nanoni.domain.services.commerce import expire_due_entitlements, fulfill_order_entitlements
 from nanoni.integrations.source.erome import EromeAdapter
 from nanoni.integrations.source.erome_service import acquire_pack_item
-from nanoni.jobs.engine import claim_next, fail, succeed
+from nanoni.integrations.telegram.media_gateway import TelegramMediaGateway
+from nanoni.integrations.telegram.vault import upload_asset_to_vault
+from nanoni.jobs.engine import claim_next, fail, recover_stale, succeed
 
 logger = logging.getLogger(__name__)
 
@@ -50,16 +52,62 @@ def _acquire_media(db, job: Job) -> None:
         adapter.client.close()
 
 
+def _telegram_gateway() -> TelegramMediaGateway:
+    settings = get_settings()
+    return TelegramMediaGateway(
+        bot_token=settings.telegram_bot_token,
+        api_base_url=settings.telegram_api_base_url,
+        local_api_base_url=settings.telegram_local_api_base_url,
+        normal_upload_limit_bytes=settings.telegram_bot_api_max_upload_bytes,
+    )
+
+
+def _upload_vault(db, job: Job) -> None:
+    gateway = _telegram_gateway()
+    asset_id = str(job.payload["asset_id"])
+    last_reported = 0
+
+    def report_progress(sent: int, total: int) -> None:
+        nonlocal last_reported
+        if sent < total and sent - last_reported < 5 * 1024 * 1024:
+            return
+        last_reported = sent
+        job.payload = {**job.payload, "bytes_sent": sent, "total_bytes": total}
+        db.add(job)
+        db.commit()
+
+    try:
+        upload_asset_to_vault(
+            db,
+            asset_id=asset_id,
+            vault_chat_id=str(job.payload["vault_chat_id"]),
+            media_root=get_settings().media_root,
+            gateway=gateway,
+            progress=report_progress,
+        )
+    except Exception:
+        db.rollback()
+        asset = db.get(MediaAsset, asset_id)
+        if asset:
+            asset.status = AssetStatus.FAILED
+            db.commit()
+        raise
+    finally:
+        gateway.close()
+
+
 HANDLERS: dict[str, Callable] = {
     "FULFILL_ACCESS": _fulfill_access,
     "EXPIRE_ACCESS": _expire_access,
     "ACQUIRE_MEDIA": _acquire_media,
+    "UPLOAD_VAULT": _upload_vault,
 }
 
 
 def run_once(worker_id: str = "local-worker") -> bool:
     db = SessionLocal()
     try:
+        recover_stale(db)
         job = claim_next(db, worker_id)
         if not job:
             db.rollback()

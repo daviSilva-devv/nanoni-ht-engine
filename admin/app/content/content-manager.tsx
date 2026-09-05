@@ -6,8 +6,10 @@ import type {
   Candidate,
   CandidateDetail,
   ContentPack,
+  MediaManifest,
   Microniche,
   PackItem,
+  SelectedAcquisition,
   WatchStatus,
 } from "../../lib/content-types";
 
@@ -20,6 +22,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     try {
       const body = (await response.json()) as {detail?: unknown};
       if (typeof body.detail === "string") detail = body.detail;
+      else if (
+        body.detail &&
+        typeof body.detail === "object" &&
+        "message" in body.detail &&
+        typeof body.detail.message === "string"
+      ) detail = body.detail.message;
     } catch {}
     throw new Error(detail);
   }
@@ -57,6 +65,8 @@ export default function ContentManager({
   const [notice, setNotice] = useState<Notice | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [dedupeResult, setDedupeResult] = useState<string | null>(null);
+  const [eromeUrl, setEromeUrl] = useState("");
+  const [eromeManifest, setEromeManifest] = useState<MediaManifest | null>(null);
 
   const selectedCount = items.reduce((total, item) => total + Number(item.selected), 0);
   const physicalCount = watchStatus
@@ -115,6 +125,43 @@ export default function ContentManager({
         kind: "ok",
         text: `${imported.pack_id}: ${fileCount} itens importados (${imported.import_classification}).`,
       });
+    } catch (error) {
+      setNotice({kind: "error", text: (error as Error).message});
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const inspectErome = async () => {
+    setBusy("erome-inspect");
+    setNotice(null);
+    try {
+      const manifest = await request<MediaManifest>("erome/inspect", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({locator: eromeUrl.trim()}),
+      });
+      setEromeManifest(manifest);
+      setNotice({kind: "ok", text: `Inspect concluído: ${manifest.media.length} itens, sem download.`});
+    } catch (error) {
+      setEromeManifest(null);
+      setNotice({kind: "error", text: (error as Error).message});
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const importErome = async () => {
+    setBusy("erome-import");
+    setNotice(null);
+    try {
+      const imported = await request<CandidateDetail>("erome/import", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({locator: eromeUrl.trim()}),
+      });
+      await Promise.all([refreshOverview(), openCandidate(imported.id)]);
+      setNotice({kind: "ok", text: `Erome importado: ${imported.import_classification}.`});
     } catch (error) {
       setNotice({kind: "error", text: (error as Error).message});
     } finally {
@@ -225,8 +272,69 @@ export default function ContentManager({
     }
   };
 
+  const waitForAcquisition = async (packId: string) => {
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const current = await request<ContentPack>(`packs/${packId}`);
+      applyPack(current);
+      const selected = current.items.filter(item => item.selected);
+      if (selected.every(item => ["LOCAL_READY", "FAILED"].includes(item.asset.status))) {
+        return current;
+      }
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    throw new Error("Aquisição ainda não terminou; consulte novamente o status.");
+  };
+
+  const acquireSelected = async () => {
+    if (!pack || !candidate) return;
+    setBusy("acquire");
+    setNotice(null);
+    try {
+      const {selectedPositions} = await saveReview();
+      if (!selectedPositions.length) throw new Error("Selecione ao menos um item para adquirir.");
+      const queued = await request<SelectedAcquisition>(`packs/${pack.id}/acquire-selected`, {
+        method: "POST",
+      });
+      const acquired = await waitForAcquisition(pack.id);
+      applyPack(acquired);
+      const [detail, nextCandidates, nextStatus] = await Promise.all([
+        request<CandidateDetail>(`candidates/${candidate.id}`),
+        request<Candidate[]>("candidates"),
+        request<WatchStatus>("watch-folder/status"),
+      ]);
+      setCandidate(detail);
+      setCandidates(nextCandidates);
+      setWatchStatus(nextStatus);
+      const failed = acquired.items.filter(
+        item => item.selected && item.asset.status === "FAILED",
+      );
+      if (failed.length) throw new Error(`${failed.length} item(ns) falharam na aquisição.`);
+      setNotice({kind: "ok", text: `Aquisição concluída (${queued.jobs.length} job(s) novo(s)).`});
+    } catch (error) {
+      setNotice({kind: "error", text: (error as Error).message});
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <div className="content-workflow">
+      <section className="card erome-import">
+        <div className="row">
+          <div><h2>Erome público</h2><p className="muted">Inspecione o manifesto primeiro; nenhum arquivo de mídia é baixado nesta etapa.</p></div>
+        </div>
+        <div className="erome-controls">
+          <label><span>URL do álbum</span><input data-testid="erome-url" type="url" value={eromeUrl} onChange={event => setEromeUrl(event.target.value)} placeholder="https://www.erome.com/a/..." /></label>
+          <button className="button secondary" type="button" onClick={inspectErome} disabled={busy !== null || !eromeUrl.trim()}>{busy === "erome-inspect" ? "Inspecionando…" : "Inspect"}</button>
+          <button className="button primary" type="button" onClick={importErome} disabled={busy !== null || !eromeManifest || eromeManifest.source_url !== eromeUrl.trim()}>{busy === "erome-import" ? "Importando…" : "Importar manifesto"}</button>
+        </div>
+        {eromeManifest ? (
+          <div className="manifest-result" data-testid="erome-manifest">
+            <div className="row"><strong>{eromeManifest.title ?? eromeManifest.source_external_id}</strong><span className="pill" data-testid="manifest-count">{eromeManifest.media.length} itens</span></div>
+            <ol>{eromeManifest.media.map((item, index) => <li key={item.external_item_id ?? `${item.source_reference}-${index}`}><span>{index + 1}</span><strong>{item.media_type}</strong><span>{item.original_filename ?? "sem nome"}</span></li>)}</ol>
+          </div>
+        ) : null}
+      </section>
       <section className="card content-import">
         <div className="row">
           <div><h2>Importação manual</h2><p className="muted">Envie imagens e vídeos juntos para criar um único pack.</p></div>
@@ -281,7 +389,7 @@ export default function ContentManager({
                   const filename = item.original_filename ?? item.asset.original_filename ?? item.id;
                   const previewUrl = `/api/content/assets/${item.asset.id}/original`;
                   return <article className={item.selected ? "pack-item selected" : "pack-item"} key={item.id} data-item-id={item.id}>
-                    <div className="media-preview">{item.asset.media_type === "VIDEO" ? <video controls preload="metadata" src={previewUrl} data-testid="video-preview" /> : <img src={previewUrl} alt={`Preview de ${filename}`} data-testid="image-preview" />}</div>
+                    <div className="media-preview">{item.asset.status !== "LOCAL_READY" ? <div className="media-pending" data-testid="media-pending">{item.asset.status}</div> : item.asset.media_type === "VIDEO" ? <video controls preload="metadata" src={previewUrl} data-testid="video-preview" /> : <img src={previewUrl} alt={`Preview de ${filename}`} data-testid="image-preview" />}</div>
                     <div className="item-toolbar"><label><input type="checkbox" checked={item.selected} onChange={() => toggleItem(item.id)} data-testid="item-selected" />Selecionado</label><div><button type="button" onClick={() => moveItem(index, -1)} disabled={index === 0} aria-label={`Mover ${filename} para cima`}>↑</button><button type="button" onClick={() => moveItem(index, 1)} disabled={index === items.length - 1} aria-label={`Mover ${filename} para baixo`}>↓</button></div></div>
                     <h3 data-testid="item-filename">{filename}</h3>
                     <dl className="asset-facts"><div><dt>Ordem</dt><dd data-testid="item-position">{index + 1}</dd></div><div><dt>Tipo</dt><dd>{item.asset.media_type}</dd></div><div><dt>Tamanho</dt><dd>{formatBytes(item.asset.size)}</dd></div><div><dt>Físico</dt><dd>{item.asset.status}</dd></div></dl>
@@ -293,6 +401,7 @@ export default function ContentManager({
                 <button className="button secondary" type="button" onClick={classifyDuplicate} disabled={busy !== null}>Classificar duplicate</button>
                 {dedupeResult ? <strong data-testid="dedupe-result">{dedupeResult}</strong> : null}<span className="action-spacer" />
                 <button className="button secondary" type="button" onClick={save} disabled={busy !== null}>Salvar revisão</button>
+                {candidate.manifest.source === "erome" ? <button className="button secondary" type="button" onClick={acquireSelected} disabled={busy !== null || selectedCount === 0} data-testid="acquire-selected">{busy === "acquire" ? "Adquirindo…" : "Acquire Selected"}</button> : null}
                 <button className="button secondary" type="button" onClick={() => decide("defer")} disabled={busy !== null}>Deferir</button>
                 <button className="button danger-button" type="button" onClick={() => decide("reject")} disabled={busy !== null}>Rejeitar</button>
                 <button className="button primary" type="button" onClick={() => decide("approve")} disabled={busy !== null || selectedCount === 0}>Aprovar</button>

@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+from collections.abc import Generator
 from typing import Annotated
 
 from fastapi import (
@@ -29,11 +30,13 @@ from nanoni.domain.schemas import (
     CandidateImportRead,
     CandidateRead,
     CandidateReview,
+    EromeLocator,
     MediaManifest,
     PackItemOrder,
     PackItemSelection,
     PackRead,
     PackUpdate,
+    SelectedAcquisitionRead,
     SourceCreate,
     SourceRead,
     WatchFolderScanResult,
@@ -49,6 +52,17 @@ from nanoni.domain.services.content import (
     set_pack_selection,
     update_pack,
 )
+from nanoni.integrations.source.erome import (
+    EromeAdapter,
+    EromeAdapterError,
+    EromeTimeout,
+    UnsafeEromeUrl,
+    UnsupportedEromeUrl,
+)
+from nanoni.integrations.source.erome_service import (
+    enqueue_selected_acquisition,
+    inspect_and_import,
+)
 from nanoni.media.importer import import_streams
 from nanoni.media.runtime import ensure_runtime_layout, original_file
 from nanoni.media.watch_folder import scan_watch_folder, watch_folder_status
@@ -56,6 +70,27 @@ from nanoni.media.watch_folder import scan_watch_folder, watch_folder_status
 router = APIRouter(prefix="/content", tags=["content"])
 Admin = Annotated[None, Depends(require_admin)]
 DB = Annotated[Session, Depends(get_db)]
+
+
+def get_erome_adapter() -> Generator[EromeAdapter, None, None]:
+    adapter = EromeAdapter()
+    try:
+        yield adapter
+    finally:
+        adapter.client.close()
+
+
+Erome = Annotated[EromeAdapter, Depends(get_erome_adapter)]
+
+
+def _raise_erome_http_error(exc: EromeAdapterError) -> None:
+    if isinstance(exc, (UnsupportedEromeUrl, UnsafeEromeUrl)):
+        code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    elif isinstance(exc, EromeTimeout):
+        code = status.HTTP_504_GATEWAY_TIMEOUT
+    else:
+        code = status.HTTP_502_BAD_GATEWAY
+    raise HTTPException(code, {"code": exc.code, "message": str(exc)}) from exc
 
 
 def _import_response(outcome: ImportOutcome) -> CandidateImportRead:
@@ -154,6 +189,50 @@ def manual_import(
     finally:
         for item in files:
             item.file.close()
+
+
+@router.post("/erome/inspect", response_model=MediaManifest)
+def inspect_erome(payload: EromeLocator, _: Admin, adapter: Erome):
+    try:
+        return adapter.inspect(payload.locator)
+    except EromeAdapterError as exc:
+        _raise_erome_http_error(exc)
+
+
+@router.post(
+    "/erome/import",
+    response_model=CandidateImportRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def import_erome(payload: EromeLocator, _: Admin, db: DB, adapter: Erome):
+    try:
+        outcome = inspect_and_import(db, payload.locator, adapter)
+        db.commit()
+        db.refresh(outcome.candidate)
+        return _import_response(outcome)
+    except EromeAdapterError as exc:
+        db.rollback()
+        _raise_erome_http_error(exc)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+@router.post("/packs/{pack_id}/acquire-selected", response_model=SelectedAcquisitionRead)
+def acquire_selected(pack_id: str, _: Admin, db: DB):
+    try:
+        jobs = enqueue_selected_acquisition(db, pack_id)
+        db.commit()
+        return SelectedAcquisitionRead(
+            pack_id=pack_id,
+            jobs=[
+                {"id": job.id, "status": job.status, "pack_item_id": str(job.payload["pack_item_id"])}
+                for job in jobs
+            ],
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
 
 def _decision(

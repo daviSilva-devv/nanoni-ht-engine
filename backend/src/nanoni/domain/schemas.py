@@ -362,6 +362,10 @@ class CandidateImport(BaseModel):
     manifest: MediaManifest
 
 
+class EromeLocator(BaseModel):
+    locator: str = Field(min_length=1, max_length=2048)
+
+
 class CandidateRead(ORMModel):
     id: str
     source_id: str
@@ -450,6 +454,17 @@ class WatchFolderScanResult(BaseModel):
     candidate_ids: list[str]
     failed_files: list[str]
     recovered_files: list[str]
+
+
+class AcquisitionJobRead(BaseModel):
+    id: str
+    status: str
+    pack_item_id: str
+
+
+class SelectedAcquisitionRead(BaseModel):
+    pack_id: str
+    jobs: list[AcquisitionJobRead]
 
 
 class CandidateDecision(BaseModel):

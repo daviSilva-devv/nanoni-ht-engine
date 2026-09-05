@@ -72,3 +72,30 @@ export type WatchStatus = {
   folders: Record<string, string>;
   counts: Record<string, number>;
 };
+
+export type ManifestAsset = {
+  external_item_id: string | null;
+  media_type: string;
+  source_reference: string | null;
+  original_filename: string | null;
+  mime_type: string | null;
+  thumbnail_ref: string | null;
+  downloadable: boolean;
+  metadata: Record<string, unknown>;
+};
+
+export type MediaManifest = {
+  source: string;
+  source_external_id: string;
+  source_collection_id: string | null;
+  source_url: string | null;
+  title: string | null;
+  caption: string | null;
+  media: ManifestAsset[];
+  metadata: Record<string, unknown>;
+};
+
+export type SelectedAcquisition = {
+  pack_id: string;
+  jobs: Array<{id: string; status: string; pack_item_id: string}>;
+};

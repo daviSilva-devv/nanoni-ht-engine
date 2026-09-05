@@ -4,10 +4,9 @@ from nanoni.integrations.source.erome import EromeAdapter
 def test_erome_album_becomes_ordered_manifest():
     html = """
     <html><head><meta property='og:title' content='Pack Test'></head><body>
-      <div class='img' data-src='https://cdn.test/1.jpg'></div>
-      <source src='https://cdn.test/2.mp4'>
-      <div class='img' data-src='https://cdn.test/3.jpg'></div>
-      <source src='https://cdn.test/2.mp4'>
+      <div class='media-group'><div class='img' data-src='https://s1.erome.com/1.jpg'></div></div>
+      <div class='media-group'><video><source src='https://v1.erome.com/2.mp4'></video></div>
+      <div class='media-group'><div class='img' data-src='https://s1.erome.com/3.jpg'></div></div>
     </body></html>
     """
     manifest = EromeAdapter.parse_album_html("https://www.erome.com/abc123", html)

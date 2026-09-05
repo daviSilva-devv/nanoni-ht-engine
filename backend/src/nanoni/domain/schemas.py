@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ORMModel(BaseModel):
@@ -295,28 +295,66 @@ class SourceRead(SourceCreate, ORMModel):
 
 
 class ManifestAsset(BaseModel):
-    source_locator: str
+    external_item_id: str | None = None
     media_type: str
+    source_reference: str | None = None
+    source_locator: str | None = None
+    original_filename: str | None = None
+    mime_type: str | None = None
     mime: str | None = None
+    size: int | None = Field(default=None, ge=0)
+    duration: float | None = None
     duration_seconds: float | None = None
     width: int | None = None
     height: int | None = None
-    file_size: int | None = None
+    file_size: int | None = Field(default=None, ge=0)
     thumbnail_ref: str | None = None
     downloadable: bool = True
+    sha256: str | None = Field(default=None, pattern=r"^[a-fA-F0-9]{64}$")
+    local_path: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def normalize_aliases(self) -> "ManifestAsset":
+        self.source_reference = self.source_reference or self.source_locator
+        self.source_locator = self.source_locator or self.source_reference
+        self.mime_type = self.mime_type or self.mime
+        self.mime = self.mime or self.mime_type
+        self.size = self.size if self.size is not None else self.file_size
+        self.file_size = self.file_size if self.file_size is not None else self.size
+        self.duration = self.duration if self.duration is not None else self.duration_seconds
+        self.duration_seconds = (
+            self.duration_seconds if self.duration_seconds is not None else self.duration
+        )
+        return self
 
 
 class MediaManifest(BaseModel):
     source: str
+    source_external_id: str | None = None
     source_collection_id: str | None = None
-    source_item_id: str
+    source_item_id: str | None = None
+    context: str | None = None
     source_url: str | None = None
     title: str | None = None
     caption: str | None = None
+    discovered_at: datetime | None = None
     created_at: datetime | None = None
     media: list[ManifestAsset] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def normalize_source_fields(self) -> "MediaManifest":
+        external_id = self.source_external_id or self.source_item_id
+        if not external_id:
+            raise ValueError("source_external_id or source_item_id is required")
+        self.source_external_id = external_id
+        self.source_item_id = external_id
+        self.context = self.context or self.source_url
+        self.source_url = self.source_url or self.context
+        self.discovered_at = self.discovered_at or self.created_at
+        self.created_at = self.created_at or self.discovered_at
+        return self
 
 
 class CandidateImport(BaseModel):
@@ -333,11 +371,96 @@ class CandidateRead(ORMModel):
     title: str | None
     caption: str | None
     status: str
+    duplicate_classification: str = "NEW"
     manifest: dict[str, Any]
+
+
+class CandidateImportRead(CandidateRead):
+    pack_id: str
+    import_classification: str
+
+
+class PackItemSelection(BaseModel):
+    selected_positions: list[int]
+
+
+class PackItemOrder(BaseModel):
+    item_ids: list[str]
+
+
+class PackUpdate(BaseModel):
+    title: str | None = Field(default=None, max_length=500)
+    caption: str | None = None
+    tags: list[str] | None = None
+    microniche_ids: list[str] | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class MediaAssetRead(ORMModel):
+    id: str
+    media_type: str
+    source_locator: str | None
+    original_filename: str | None
+    mime: str | None
+    mime_type: str | None = Field(validation_alias="mime")
+    duration_seconds: float | None
+    duration: float | None = Field(validation_alias="duration_seconds")
+    width: int | None
+    height: int | None
+    file_size: int | None
+    size: int | None = Field(validation_alias="file_size")
+    sha256: str | None
+    status: str
+    metadata_json: dict[str, Any]
+
+
+class PackItemRead(BaseModel):
+    id: str
+    position: int
+    selected: bool
+    role: str
+    source_id: str | None
+    source_external_id: str | None
+    source_reference: str | None
+    original_filename: str | None
+    metadata: dict[str, Any]
+    asset: MediaAssetRead
+
+
+class PackRead(BaseModel):
+    id: str
+    candidate_id: str | None
+    title: str | None
+    caption: str | None
+    status: str
+    approved: bool
+    archived: bool
+    metadata: dict[str, Any]
+    tags: list[str]
+    microniche_ids: list[str]
+    items: list[PackItemRead]
+
+
+class WatchFolderStatus(BaseModel):
+    folders: dict[str, str]
+    counts: dict[str, int]
+
+
+class WatchFolderScanResult(BaseModel):
+    candidate_ids: list[str]
+    failed_files: list[str]
+    recovered_files: list[str]
 
 
 class CandidateDecision(BaseModel):
     decision: str
+    target: str | None = None
+    microniche_ids: list[str] = Field(default_factory=list)
+    selected_positions: list[int] | None = None
+    notes: str | None = None
+
+
+class CandidateReview(BaseModel):
     target: str | None = None
     microniche_ids: list[str] = Field(default_factory=list)
     selected_positions: list[int] | None = None

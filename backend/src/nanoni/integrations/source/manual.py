@@ -21,8 +21,10 @@ class ManualUploadAdapter(SourceAdapter):
             title=path.name,
             media=[
                 ManifestAsset(
+                    external_item_id=str(path.resolve()),
                     source_locator=str(path.resolve()),
                     media_type=media_type,
+                    original_filename=path.name,
                     file_size=path.stat().st_size,
                 )
             ],
@@ -31,5 +33,7 @@ class ManualUploadAdapter(SourceAdapter):
     def acquire(self, asset_locator: str, destination: Path) -> Path:
         source = Path(asset_locator)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(source.read_bytes())
+        with source.open("rb") as source_handle, destination.open("xb") as destination_handle:
+            while chunk := source_handle.read(1024 * 1024):
+                destination_handle.write(chunk)
         return destination

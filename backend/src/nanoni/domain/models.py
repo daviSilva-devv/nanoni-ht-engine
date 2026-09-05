@@ -25,6 +25,7 @@ from nanoni.domain.enums import (
     CandidateStatus,
     DestinationStatus,
     DestinationType,
+    DuplicateClassification,
     EntitlementStatus,
     JobStatus,
     JobType,
@@ -34,6 +35,7 @@ from nanoni.domain.enums import (
     ModerationSeverity,
     OfferKind,
     OrderStatus,
+    PackStatus,
     PaymentStatus,
     PlanKind,
     PublicationStatus,
@@ -260,6 +262,9 @@ class ContentCandidate(TimestampMixin, Base):
     title: Mapped[str | None] = mapped_column(String(500))
     caption: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(32), default=CandidateStatus.PENDING_APPROVAL)
+    duplicate_classification: Mapped[str] = mapped_column(
+        String(32), default=DuplicateClassification.NEW
+    )
     manifest: Mapped[dict] = mapped_column(SAJSON, default=dict)
     source_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -272,9 +277,11 @@ class ContentPack(TimestampMixin, Base):
     )
     title: Mapped[str | None] = mapped_column(String(500))
     caption: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(24), default=PackStatus.REVIEW)
     approved: Mapped[bool] = mapped_column(Boolean, default=False)
     content_score: Mapped[float] = mapped_column(Float, default=0.0)
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    metadata_json: Mapped[dict] = mapped_column(SAJSON, default=dict)
 
 
 class MediaAsset(TimestampMixin, Base):
@@ -285,6 +292,7 @@ class MediaAsset(TimestampMixin, Base):
     )
     media_type: Mapped[str] = mapped_column(String(16), default=MediaType.VIDEO)
     source_locator: Mapped[str | None] = mapped_column(Text)
+    original_filename: Mapped[str | None] = mapped_column(String(500))
     mime: Mapped[str | None] = mapped_column(String(120))
     extension: Mapped[str | None] = mapped_column(String(16))
     duration_seconds: Mapped[float | None] = mapped_column(Float)
@@ -318,6 +326,11 @@ class PackItem(Base):
     role: Mapped[str] = mapped_column(String(24), default="MASTER")
     selected: Mapped[bool] = mapped_column(Boolean, default=True)
     derivative_of_asset_id: Mapped[str | None] = mapped_column(ForeignKey("media_assets.id"))
+    source_id: Mapped[str | None] = mapped_column(ForeignKey("sources.id"), index=True)
+    source_external_id: Mapped[str | None] = mapped_column(String(255), index=True)
+    source_reference: Mapped[str | None] = mapped_column(Text)
+    original_filename: Mapped[str | None] = mapped_column(String(500))
+    metadata_json: Mapped[dict] = mapped_column(SAJSON, default=dict)
 
 
 class ContentPackMicroNiche(Base):

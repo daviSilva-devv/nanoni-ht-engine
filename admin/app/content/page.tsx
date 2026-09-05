@@ -1,3 +1,24 @@
+import ContentManager from "./content-manager";
 import {api} from "../../lib/api";
-type Candidate={id:string;title:string|null;status:string;source_url:string|null};
-export default async function ContentPage(){const rows=await api<Candidate[]>("/api/v1/content/candidates");return <><div className="eyebrow">Content Engine</div><h1 className="title">Conteúdo</h1><div className="card"><div className="row"><div><h2>Fila de aprovação</h2><p className="muted">A UI de aprovação completa entra na fase Content Core.</p></div><span className="pill">{rows?.length??0} candidatos</span></div>{rows?.length?<table className="table"><thead><tr><th>Título</th><th>Status</th><th>Origem</th></tr></thead><tbody>{rows.slice(0,50).map(x=><tr key={x.id}><td>{x.title??x.id}</td><td>{x.status}</td><td>{x.source_url??"helper/manual"}</td></tr>)}</tbody></table>:<div className="empty">Nenhum candidato ainda.</div>}</div></>}
+import type {Candidate, Microniche, WatchStatus} from "../../lib/content-types";
+
+export const dynamic = "force-dynamic";
+
+export default async function ContentPage() {
+  const [candidates, microniches, watchStatus] = await Promise.all([
+    api<Candidate[]>("/api/v1/content/candidates"),
+    api<Microniche[]>("/api/v1/admin-config/microniches"),
+    api<WatchStatus>("/api/v1/content/watch-folder/status"),
+  ]);
+  return (
+    <>
+      <div className="eyebrow">Content Engine</div>
+      <h1 className="title">Revisão de conteúdo</h1>
+      <ContentManager
+        initialCandidates={candidates ?? []}
+        initialMicroniches={(microniches ?? []).filter(item => item.active)}
+        initialWatchStatus={watchStatus}
+      />
+    </>
+  );
+}

@@ -19,7 +19,6 @@ npm-debug.log*
 # Runtime
 .env
 runtime/
-media/
 logs/
 
 # OS/editor

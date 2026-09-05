@@ -104,6 +104,18 @@ class ApprovalDecision(StrEnum):
     DEFERRED = "DEFERRED"
 
 
+class DuplicateClassification(StrEnum):
+    NEW = "NEW"
+    SAME_SOURCE_ITEM = "SAME_SOURCE_ITEM"
+    SAME_SHA256 = "SAME_SHA256"
+
+
+class PackStatus(StrEnum):
+    REVIEW = "REVIEW"
+    READY = "READY"
+    REJECTED = "REJECTED"
+
+
 class PublicationTarget(StrEnum):
     FREE = "FREE"
     VIP = "VIP"

@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     payment_provider: str = "mock"
     external_checkout_base_url: str = "http://localhost:3000/checkout"
     telegram_bot_token: str = ""
+    telegram_webhook_secret: str = ""
     telegram_api_base_url: str = "https://api.telegram.org"
     telegram_local_api_base_url: str = ""
     telegram_vault_chat_id: str = ""

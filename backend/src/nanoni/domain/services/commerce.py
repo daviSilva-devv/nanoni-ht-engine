@@ -24,6 +24,7 @@ from nanoni.domain.models import (
     PricePlan,
     Product,
 )
+from nanoni.domain.services.access import plan_membership_grants
 from nanoni.domain.services.sales import record_lead_event
 from nanoni.domain.transitions import ensure_transition
 from nanoni.integrations.payment.base import PaymentProvider, WebhookEvent
@@ -214,13 +215,16 @@ def fulfill_order_entitlements(db: Session, order_id: str) -> list[Entitlement]:
     if not order:
         raise ValueError("order not found")
     if order.status == OrderStatus.FULFILLED:
-        return list(
+        entitlements = list(
             db.scalars(
                 select(Entitlement)
                 .join(OrderItem, Entitlement.source_order_item_id == OrderItem.id)
                 .where(OrderItem.order_id == order.id)
             )
         )
+        for entitlement in entitlements:
+            plan_membership_grants(db, entitlement.id)
+        return entitlements
     if order.status != OrderStatus.PAID and order.status != OrderStatus.ACCESS_PENDING:
         raise ValueError(f"order {order.id} is not paid")
     if order.status == OrderStatus.PAID:
@@ -266,6 +270,8 @@ def fulfill_order_entitlements(db: Session, order_id: str) -> list[Entitlement]:
     lead = db.scalar(select(Lead).where(Lead.customer_id == order.customer_id))
     if lead:
         record_lead_event(db, lead, "ACCESS_GRANTED", payload={"order_id": order.id})
+    for entitlement in entitlements:
+        plan_membership_grants(db, entitlement.id)
     db.flush()
     return entitlements
 

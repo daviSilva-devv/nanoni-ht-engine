@@ -8,6 +8,7 @@ from nanoni.core.config import get_settings
 from nanoni.core.db import SessionLocal
 from nanoni.domain.enums import AssetStatus, PublicationStatus
 from nanoni.domain.models import Job, MediaAsset, PackItem, PublicationJob
+from nanoni.domain.services.access import has_expired_memberships, remove_expired_memberships
 from nanoni.domain.services.commerce import expire_due_entitlements, fulfill_order_entitlements
 from nanoni.domain.services.publishing import (
     PublicationOutcomeUnknownError,
@@ -30,6 +31,13 @@ def _fulfill_access(db, job: Job) -> None:
 
 def _expire_access(db, job: Job) -> None:
     expire_due_entitlements(db)
+    if not has_expired_memberships(db):
+        return
+    publisher = _telegram_publisher()
+    try:
+        remove_expired_memberships(db, publisher=publisher)
+    finally:
+        publisher.close()
 
 
 def _acquire_media(db, job: Job) -> None:

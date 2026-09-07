@@ -50,6 +50,9 @@ class TelegramPublisher(ABC):
     @abstractmethod
     def approve_join_request(self, *, chat_id: str, telegram_user_id: str) -> None: ...
 
+    def decline_join_request(self, *, chat_id: str, telegram_user_id: str) -> None:
+        raise NotImplementedError
+
     @abstractmethod
     def remove_member(self, *, chat_id: str, telegram_user_id: str) -> None: ...
 
@@ -186,6 +189,14 @@ class BotAPITelegramPublisher(TelegramPublisher):
         )
         if result is not True:
             raise TelegramPublisherError("Telegram did not confirm join request approval")
+
+    def decline_join_request(self, *, chat_id: str, telegram_user_id: str) -> None:
+        result = self._post(
+            "declineChatJoinRequest",
+            {"chat_id": chat_id, "user_id": telegram_user_id},
+        )
+        if result is not True:
+            raise TelegramPublisherError("Telegram did not confirm join request decline")
 
     def remove_member(self, *, chat_id: str, telegram_user_id: str) -> None:
         result = self._post(

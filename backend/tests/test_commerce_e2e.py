@@ -1,13 +1,17 @@
 from decimal import Decimal
 
+from sqlalchemy import select
+
 from nanoni.domain.enums import EntitlementStatus, OrderStatus, PaymentStatus
 from nanoni.domain.models import (
     Community,
     CommunityVersion,
+    MembershipGrant,
     Niche,
     Order,
     PricePlan,
     Product,
+    TelegramDestination,
 )
 from nanoni.domain.services.commerce import (
     create_order,
@@ -46,6 +50,15 @@ def _catalog(db):
 
 def test_payment_webhook_is_idempotent_and_access_is_exactly_once(db):
     version, product, plan = _catalog(db)
+    destination = TelegramDestination(
+        community_id=db.get(CommunityVersion, version.id).community_id,
+        name="VIP",
+        destination_type="VIP_FORUM",
+        telegram_chat_id="-100123",
+        status="ACTIVE",
+    )
+    db.add(destination)
+    db.flush()
     provider = MockPaymentProvider()
     order, payment = create_order(
         db,
@@ -77,3 +90,14 @@ def test_payment_webhook_is_idempotent_and_access_is_exactly_once(db):
     assert first[0].status == EntitlementStatus.ACTIVE
     assert first[0].expires_at is None
     assert db.get(Order, order.id).status == OrderStatus.FULFILLED
+    grants = list(db.scalars(select(MembershipGrant)))
+    assert len(grants) == 1
+    assert grants[0].entitlement_id == first[0].id
+    assert grants[0].telegram_user_id == "12345"
+
+    db.delete(grants[0])
+    db.flush()
+    repaired = fulfill_order_entitlements(db, order.id)
+    repaired_grants = list(db.scalars(select(MembershipGrant)))
+    assert repaired == first
+    assert len(repaired_grants) == 1

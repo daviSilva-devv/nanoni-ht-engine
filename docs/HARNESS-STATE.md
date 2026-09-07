@@ -1,13 +1,13 @@
-CURRENT_PHASE: 4A
-STATUS: GREEN_DETERMINISTIC
-AGENT: Claude Code
-BASE_COMMIT: 857c2f9
-LAST_GREEN_PHASE: 3
-LAST_GREEN_COMMIT: 857c2f9
-CURRENT_WORK: Telegram Vault + Media Gateway
-BLOCKERS: Telegram real credentials unavailable
-BLOCKED_EXTERNAL: Telegram credentials / Vault destination required for real gate.
-NEXT: Run the real Telegram gate once credentials + vault chat are configured, then declare Phase 4A fully GREEN and proceed to Phase 4B.
+CURRENT_PHASE: 4B
+STATUS: IN_PROGRESS
+AGENT: Codex
+BASE_COMMIT: abc9663
+LAST_GREEN_PHASE: 4A
+LAST_GREEN_COMMIT: abc9663
+CURRENT_WORK: Telegram Publisher
+BLOCKERS: none
+BLOCKED_EXTERNAL: none
+NEXT: Implement the TelegramPublisher boundary and gate approved-pack publication to a configured destination/topic exactly once.
 
 DONE:
 - TelegramMediaGateway: HTTPX streaming upload with progress callback, retry/backoff on 429 + 5xx, honours retry_after.
@@ -29,4 +29,8 @@ DETERMINISTIC_GATES (all GREEN):
 
 IMPORTANT_NOTES:
 - Phase 4A is backend-only; no frontend changes, Next.js build gate not re-run.
-- Real Telegram upload path unverified: no bot token / vault chat configured. This is an external blocker, not an implementation failure.
+- Phase 4A real gate GREEN: Telegram send + getFile succeeded with a sub-50 MB generated fixture.
+- Real gate persisted telegram_file_id, telegram_file_unique_id, vault_chat_id, vault_message_id and a verified VaultObject; MediaAsset became VAULTED.
+- The local fixture remained present after confirmation; a repeated service call and repeated enqueue produced no duplicate upload/job.
+- Targeted closure checks: vault admin auth test passed; Alembic current is bd14ac8e712f (head), and Alembic check reports no new operations.
+- Phase 4A was fast-forwarded to main and tagged phase-4a-green at abc9663.

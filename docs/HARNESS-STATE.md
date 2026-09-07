@@ -1,13 +1,13 @@
-CURRENT_PHASE: 7
-STATUS: GREEN
+CURRENT_PHASE: 8
+STATUS: IN_PROGRESS
 AGENT: Codex
-BASE_COMMIT: 369a831
-LAST_GREEN_PHASE: 6
-LAST_GREEN_COMMIT: 369a831
-CURRENT_WORK: Sales Router
+BASE_COMMIT: 718fee7
+LAST_GREEN_PHASE: 7
+LAST_GREEN_COMMIT: 718fee7
+CURRENT_WORK: Payment + Access
 BLOCKERS: none
 BLOCKED_EXTERNAL: none
-NEXT: Consolidate Phase 7, then start Phase 8 Payment + Access.
+NEXT: Select a production provider approved for the lawful adult/high-risk category, then close external checkout, verified webhook, entitlement, access, expiry, reentry, and replay gates.
 
 DONE:
 - TelegramMediaGateway: HTTPX streaming upload with progress callback, retry/backoff on 429 + 5xx, honours retry_after.
@@ -58,3 +58,4 @@ IMPORTANT_NOTES:
 - FREE routing resolves an active FREE destination through its public username or configured invite URL and preserves the lead history.
 - Phase 7 gate reaches checkout choice in four calls from a new lead (start, age confirmation, VIP intent, plan choice), with the product step removed when unambiguous.
 - Phase 7 closure gate: 84 passed, 1 expected PostgreSQL skip; Ruff, compileall, Alembic current, and Alembic check are green.
+- Phase 7 was fast-forwarded to main and tagged phase-7-green at 718fee7.

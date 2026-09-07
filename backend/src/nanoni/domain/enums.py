@@ -130,6 +130,12 @@ class PublicationStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
+class PublicationPlanStatus(StrEnum):
+    PLANNED = "PLANNED"
+    SKIPPED_NO_CONTENT = "SKIPPED_NO_CONTENT"
+    SKIPPED_CONFIGURATION = "SKIPPED_CONFIGURATION"
+
+
 class OrderStatus(StrEnum):
     CREATED = "CREATED"
     CHECKOUT_READY = "CHECKOUT_READY"

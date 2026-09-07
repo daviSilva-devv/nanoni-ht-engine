@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
 from sqlalchemy import JSON as SAJSON
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -38,6 +39,7 @@ from nanoni.domain.enums import (
     PackStatus,
     PaymentStatus,
     PlanKind,
+    PublicationPlanStatus,
     PublicationStatus,
     PublicationTarget,
     Severity,
@@ -378,6 +380,23 @@ class ScheduleWindow(TimestampMixin, Base):
     end_minute: Mapped[int] = mapped_column(Integer)
     weight: Mapped[int] = mapped_column(Integer, default=10)
     label: Mapped[str | None] = mapped_column(String(80))
+
+
+class PublicationPlan(TimestampMixin, Base):
+    __tablename__ = "publication_plans"
+    __table_args__ = (
+        UniqueConstraint("rule_id", "planning_date", "slot_index", name="uq_plan_rule_day_slot"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    rule_id: Mapped[str] = mapped_column(ForeignKey("publication_rules.id"), index=True)
+    planning_date: Mapped[date] = mapped_column(Date, index=True)
+    slot_index: Mapped[int] = mapped_column(Integer)
+    scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    status: Mapped[str] = mapped_column(String(32), default=PublicationPlanStatus.PLANNED)
+    publication_job_id: Mapped[str | None] = mapped_column(
+        ForeignKey("publication_jobs.id"), unique=True, index=True
+    )
+    reason: Mapped[str | None] = mapped_column(Text)
 
 
 class PublicationJob(TimestampMixin, Base):

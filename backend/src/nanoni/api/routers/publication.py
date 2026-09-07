@@ -1,6 +1,7 @@
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,11 +14,37 @@ from nanoni.domain.models import (
     Topic,
 )
 from nanoni.domain.services.publishing import enqueue_publication
-from nanoni.domain.services.scheduler import Window, choose_scheduled_times
+from nanoni.domain.services.scheduler import (
+    Window,
+    choose_scheduled_times,
+    plan_publication_day,
+    stock_days_for_rule,
+)
 
 router = APIRouter(
     prefix="/publication", tags=["publication"], dependencies=[Depends(require_admin)]
 )
+
+
+class PublicationPlanRead(BaseModel):
+    id: str
+    rule_id: str
+    slot_index: int
+    scheduled_for: datetime | None
+    status: str
+    publication_job_id: str | None
+    reason: str | None
+
+
+class PublicationDayPlanRead(BaseModel):
+    day: date
+    slots: list[PublicationPlanRead]
+
+
+class PublicationStockRead(BaseModel):
+    rule_id: str
+    available_packs: int
+    estimated_days: float
 
 
 @router.post("/rules")
@@ -91,6 +118,40 @@ def preview_schedule(
     windows = [Window(r.start_minute, r.end_minute, r.weight, r.label) for r in rows]
     values = choose_scheduled_times(day, windows, rule.posts_per_day, seed=seed)
     return {"rule_id": rule_id, "times": values}
+
+
+@router.post("/plan", response_model=PublicationDayPlanRead)
+def plan_day(day: date, seed: int | None = None, db: Session = Depends(get_db)):
+    plans = plan_publication_day(db, day=day, seed=seed)
+    db.commit()
+    return PublicationDayPlanRead(
+        day=day,
+        slots=[
+            PublicationPlanRead(
+                id=plan.id,
+                rule_id=plan.rule_id,
+                slot_index=plan.slot_index,
+                scheduled_for=plan.scheduled_for,
+                status=plan.status,
+                publication_job_id=plan.publication_job_id,
+                reason=plan.reason,
+            )
+            for plan in plans
+        ],
+    )
+
+
+@router.get("/rules/{rule_id}/stock", response_model=PublicationStockRead)
+def rule_stock(rule_id: str, db: Session = Depends(get_db)):
+    rule = db.get(PublicationRule, rule_id)
+    if not rule:
+        raise HTTPException(404, "rule not found")
+    available, estimated_days = stock_days_for_rule(db, rule)
+    return PublicationStockRead(
+        rule_id=rule.id,
+        available_packs=available,
+        estimated_days=estimated_days,
+    )
 
 
 @router.post("/queue")

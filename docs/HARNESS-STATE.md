@@ -1,13 +1,13 @@
 CURRENT_PHASE: 6
-STATUS: IN_PROGRESS
+STATUS: GREEN_DETERMINISTIC
 AGENT: Codex
 BASE_COMMIT: 473d140
 LAST_GREEN_PHASE: 5
 LAST_GREEN_COMMIT: 473d140
 CURRENT_WORK: Telegram Helper + localhost bridge
-BLOCKERS: none
-BLOCKED_EXTERNAL: none
-NEXT: Evolve the MV3 helper and localhost bridge so the current Telegram post context becomes a content candidate with minimal operator work.
+BLOCKERS: Telegram Web browser gate requires an operator-authenticated tab and extension interaction
+BLOCKED_EXTERNAL: Load the unpacked MV3 extension, open a Telegram Web post, and trigger Send current post to Nanoni.
+NEXT: Run the real browser gate; verify the visible Telegram post becomes the same candidate/pack returned by the helper and any selected local file is linked.
 
 DONE:
 - TelegramMediaGateway: HTTPX streaming upload with progress callback, retry/backoff on 429 + 5xx, honours retry_after.
@@ -45,3 +45,8 @@ IMPORTANT_NOTES:
 - Empty inventory persists SKIPPED_NO_CONTENT slots and opens one deduplicated queue-empty alert; stock-days endpoint reports remaining eligible packs.
 - Fresh-database migration gate passed through 9af4f0aa31d8; backend gate is 73 passed, 1 expected PostgreSQL skip.
 - Phase 5 was fast-forwarded to main and tagged phase-5-green at 473d140.
+- Phase 6 deterministic implementation: MV3 selects the visible Telegram message, extracts scoped post/album metadata, and submits a normalized signed manifest.
+- The localhost bridge can auto-create the telegram-helper source and returns candidate + pack identity in one action.
+- Optional operator-selected files are streamed into processing and linked to the same candidate; duplicate/replayed files do not create duplicate pack items, and purged assets can be restored.
+- Helper manifest and file endpoints use HMAC authentication; file-link signatures expire after five minutes.
+- Phase 6 deterministic gate: 77 passed, 1 expected PostgreSQL skip; Ruff, compileall, Alembic check, JS syntax, and MV3 manifest parsing are green.

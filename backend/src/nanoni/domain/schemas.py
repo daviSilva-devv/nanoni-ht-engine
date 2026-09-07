@@ -362,6 +362,17 @@ class CandidateImport(BaseModel):
     manifest: MediaManifest
 
 
+class HelperManifestImport(BaseModel):
+    source_id: str | None = None
+    manifest: MediaManifest
+
+
+class HelperFileImportRead(BaseModel):
+    candidate_id: str
+    pack_id: str
+    asset_ids: list[str]
+
+
 class EromeLocator(BaseModel):
     locator: str = Field(min_length=1, max_length=2048)
 

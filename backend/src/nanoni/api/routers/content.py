@@ -1,6 +1,3 @@
-import hashlib
-import hmac
-import json
 from collections.abc import Generator
 from typing import Annotated
 
@@ -21,7 +18,11 @@ from sqlalchemy.orm import Session
 
 from nanoni.core.config import get_settings
 from nanoni.core.db import get_db
-from nanoni.core.security import require_admin
+from nanoni.core.security import (
+    require_admin,
+    verify_helper_signature,
+    verify_helper_upload_signature,
+)
 from nanoni.domain.enums import ApprovalDecision
 from nanoni.domain.models import ContentCandidate, ContentPack, MediaAsset, Source
 from nanoni.domain.schemas import (
@@ -31,6 +32,8 @@ from nanoni.domain.schemas import (
     CandidateRead,
     CandidateReview,
     EromeLocator,
+    HelperFileImportRead,
+    HelperManifestImport,
     MediaManifest,
     PackItemOrder,
     PackItemSelection,
@@ -62,6 +65,10 @@ from nanoni.integrations.source.erome import (
 from nanoni.integrations.source.erome_service import (
     enqueue_selected_acquisition,
     inspect_and_import,
+)
+from nanoni.integrations.source.telegram_helper import (
+    attach_authorized_files,
+    ensure_telegram_helper_source,
 )
 from nanoni.media.importer import import_streams
 from nanoni.media.runtime import ensure_runtime_layout, original_file
@@ -391,34 +398,81 @@ def watch_status(_: Admin):
     return WatchFolderStatus(folders=folders, counts=counts)
 
 
-def _helper_signature_valid(raw: bytes, signature: str | None) -> bool:
-    if not signature:
-        return False
-    expected = hmac.new(
-        get_settings().helper_shared_secret.encode(), raw, hashlib.sha256
-    ).hexdigest()
-    return hmac.compare_digest(expected, signature)
-
-
-@router.post("/helper/manifest", response_model=CandidateRead, status_code=status.HTTP_201_CREATED)
-async def helper_manifest(
+async def verified_helper_manifest(
     request: Request,
     x_nanoni_signature: str | None = Header(default=None),
-    db: Session = Depends(get_db),
-):
+) -> HelperManifestImport:
     raw = await request.body()
-    if not _helper_signature_valid(raw, x_nanoni_signature):
+    if not verify_helper_signature(raw, x_nanoni_signature):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid helper signature")
     try:
-        payload = json.loads(raw)
-        manifest = MediaManifest.model_validate(payload["manifest"])
+        return HelperManifestImport.model_validate_json(raw)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+HelperPayload = Annotated[HelperManifestImport, Depends(verified_helper_manifest)]
+
+
+@router.post(
+    "/helper/manifest",
+    response_model=CandidateImportRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def helper_manifest(payload: HelperPayload, db: DB):
+    try:
+        source = (
+            db.get(Source, payload.source_id)
+            if payload.source_id
+            else ensure_telegram_helper_source(db)
+        )
+        if not source:
+            raise ValueError("source not found")
         outcome = import_manifest_with_classification(
-            db, source_id=payload["source_id"], manifest=manifest
+            db, source_id=source.id, manifest=payload.manifest
         )
         db.commit()
         db.refresh(outcome.candidate)
-        return outcome.candidate
-    except (KeyError, ValueError) as exc:
+        return _import_response(outcome)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+@router.post(
+    "/helper/candidates/{candidate_id}/files",
+    response_model=HelperFileImportRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def helper_candidate_files(
+    candidate_id: str,
+    files: Annotated[list[UploadFile], File()],
+    db: DB,
+    x_nanoni_timestamp: Annotated[str | None, Header()] = None,
+    x_nanoni_signature: Annotated[str | None, Header()] = None,
+):
+    if not verify_helper_upload_signature(
+        candidate_id, x_nanoni_timestamp, x_nanoni_signature
+    ):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid helper signature")
+    if not 1 <= len(files) <= 10:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "upload requires 1..10 files")
+    try:
+        pack_id, asset_ids = attach_authorized_files(
+            db,
+            candidate_id=candidate_id,
+            files=(
+                (item.filename or "upload", item.content_type, item.file) for item in files
+            ),
+            root=get_settings().media_root,
+        )
+        db.commit()
+        return HelperFileImportRead(
+            candidate_id=candidate_id,
+            pack_id=pack_id,
+            asset_ids=asset_ids,
+        )
+    except ValueError as exc:
         db.rollback()
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 

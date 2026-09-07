@@ -1,1 +1,33 @@
-<!doctype html><html><head><meta charset="utf-8"><style>body{font:13px system-ui;width:320px;padding:14px}input,button{width:100%;box-sizing:border-box;margin:5px 0;padding:8px}button{font-weight:700}.muted{color:#666;font-size:12px}#status{white-space:pre-wrap}</style></head><body><h3>Nanoni Helper</h3><input id="backend" placeholder="Backend" value="http://127.0.0.1:8010"><input id="source" placeholder="Source ID"><input id="secret" type="password" placeholder="Helper shared secret"><button id="save">Salvar config</button><button id="send">Enviar contexto atual</button><div class="muted">O helper organiza contexto e imports autorizados. Não contorna controles de conteúdo protegido.</div><p id="status"></p><script src="popup.js"></script></body></html>
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { font: 13px system-ui; width: 340px; padding: 14px; }
+      label { display: block; margin-top: 8px; font-weight: 600; }
+      input, button { width: 100%; box-sizing: border-box; margin: 5px 0; padding: 8px; }
+      button { font-weight: 700; cursor: pointer; }
+      .muted { color: #666; font-size: 12px; line-height: 1.4; }
+      #status { white-space: pre-wrap; overflow-wrap: anywhere; }
+    </style>
+  </head>
+  <body>
+    <h3>Nanoni Helper</h3>
+    <label for="backend">Bridge local</label>
+    <input id="backend" value="http://127.0.0.1:8010" />
+    <label for="source">Source ID (opcional)</label>
+    <input id="source" placeholder="Criação automática quando vazio" />
+    <label for="secret">Token desta instalação</label>
+    <input id="secret" type="password" autocomplete="off" />
+    <button id="save" type="button">Salvar configuração</button>
+    <label for="files">Arquivos salvos pelo operador (opcional)</label>
+    <input id="files" type="file" accept="image/*,video/*" multiple />
+    <button id="send" type="button">Enviar post atual para Nanoni</button>
+    <p class="muted">
+      Abra o post no Telegram Web e mantenha-o visível. O helper coleta apenas metadados
+      expostos e arquivos escolhidos por você; ele não contorna conteúdo protegido.
+    </p>
+    <p id="status" role="status" aria-live="polite"></p>
+    <script src="popup.js"></script>
+  </body>
+</html>

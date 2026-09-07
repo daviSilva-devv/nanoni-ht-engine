@@ -1,13 +1,13 @@
-CURRENT_PHASE: 4B
+CURRENT_PHASE: 5
 STATUS: IN_PROGRESS
 AGENT: Codex
-BASE_COMMIT: abc9663
-LAST_GREEN_PHASE: 4A
-LAST_GREEN_COMMIT: abc9663
-CURRENT_WORK: Telegram Publisher
+BASE_COMMIT: 69ca546
+LAST_GREEN_PHASE: 4B
+LAST_GREEN_COMMIT: 69ca546
+CURRENT_WORK: Persisted Scheduler
 BLOCKERS: none
 BLOCKED_EXTERNAL: none
-NEXT: Implement the TelegramPublisher boundary and gate approved-pack publication to a configured destination/topic exactly once.
+NEXT: Implement persisted planning with randomized weighted windows, spacing, microniche daily packs, and queue-empty alerts; gate a simulated 24h schedule.
 
 DONE:
 - TelegramMediaGateway: HTTPX streaming upload with progress callback, retry/backoff on 429 + 5xx, honours retry_after.
@@ -22,7 +22,7 @@ DONE:
 - .env.example: NANONI_TELEGRAM_LOCAL_API_BASE_URL, NANONI_TELEGRAM_VAULT_CHAT_ID, NANONI_TELEGRAM_BOT_API_MAX_UPLOAD_BYTES.
 
 DETERMINISTIC_GATES (all GREEN):
-- pytest backend: 60 passed, 1 skipped (Postgres env gate), incl. tests/test_telegram_vault.py (6).
+- pytest backend: 69 passed, 1 skipped (Postgres env gate), incl. Telegram Vault and Publisher coverage.
 - ruff check src tests: clean.
 - python -m compileall src: clean.
 - alembic upgrade head: clean; alembic check: no new upgrade operations.
@@ -34,3 +34,9 @@ IMPORTANT_NOTES:
 - The local fixture remained present after confirmation; a repeated service call and repeated enqueue produced no duplicate upload/job.
 - Targeted closure checks: vault admin auth test passed; Alembic current is bd14ac8e712f (head), and Alembic check reports no new operations.
 - Phase 4A was fast-forwarded to main and tagged phase-4a-green at abc9663.
+- Phase 4B real gate GREEN: a vaulted telegram_file_id was published to the configured Telegram destination and message references were persisted.
+- Publication queue and delivery are idempotent; an atomic PUBLISHING marker prevents automatic replay after ambiguous timeout/5xx outcomes.
+- Publication worker reuses Telegram file IDs, supports destination topics/protected content, and persists Publication rows before local purge.
+- Purge is restricted to assets backed by verified VaultObjects and occurs only after confirmed publication persistence; failure paths retain local files.
+- Fresh-database migration gate passed through 45d9ee8b602a; Alembic check found no pending operations.
+- Phase 4B was fast-forwarded to main and tagged phase-4b-green at 69ca546.

@@ -383,6 +383,7 @@ class ScheduleWindow(TimestampMixin, Base):
 class PublicationJob(TimestampMixin, Base):
     __tablename__ = "publication_jobs"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    idempotency_key: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     pack_id: Mapped[str] = mapped_column(ForeignKey("content_packs.id"), index=True)
     rule_id: Mapped[str | None] = mapped_column(ForeignKey("publication_rules.id"), index=True)
     destination_id: Mapped[str] = mapped_column(ForeignKey("telegram_destinations.id"), index=True)

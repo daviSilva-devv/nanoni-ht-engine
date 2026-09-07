@@ -6,12 +6,18 @@ from collections.abc import Callable
 
 from nanoni.core.config import get_settings
 from nanoni.core.db import SessionLocal
-from nanoni.domain.enums import AssetStatus
-from nanoni.domain.models import Job, MediaAsset, PackItem
+from nanoni.domain.enums import AssetStatus, PublicationStatus
+from nanoni.domain.models import Job, MediaAsset, PackItem, PublicationJob
 from nanoni.domain.services.commerce import expire_due_entitlements, fulfill_order_entitlements
+from nanoni.domain.services.publishing import (
+    PublicationOutcomeUnknownError,
+    publish_publication_job,
+    purge_confirmed_publication_files,
+)
 from nanoni.integrations.source.erome import EromeAdapter
 from nanoni.integrations.source.erome_service import acquire_pack_item
 from nanoni.integrations.telegram.media_gateway import TelegramMediaGateway
+from nanoni.integrations.telegram.publisher import BotAPITelegramPublisher
 from nanoni.integrations.telegram.vault import upload_asset_to_vault
 from nanoni.jobs.engine import claim_next, fail, recover_stale, succeed
 
@@ -62,6 +68,14 @@ def _telegram_gateway() -> TelegramMediaGateway:
     )
 
 
+def _telegram_publisher() -> BotAPITelegramPublisher:
+    settings = get_settings()
+    return BotAPITelegramPublisher(
+        bot_token=settings.telegram_bot_token,
+        api_base_url=settings.telegram_api_base_url,
+    )
+
+
 def _upload_vault(db, job: Job) -> None:
     gateway = _telegram_gateway()
     asset_id = str(job.payload["asset_id"])
@@ -96,11 +110,48 @@ def _upload_vault(db, job: Job) -> None:
         gateway.close()
 
 
+def _publish_content(db, job: Job) -> None:
+    publisher = _telegram_publisher()
+    publication_job_id = str(job.payload["publication_job_id"])
+    try:
+        publication = publish_publication_job(
+            db,
+            publication_job_id=publication_job_id,
+            publisher=publisher,
+        )
+        db.commit()
+        purge_confirmed_publication_files(
+            db,
+            publication_id=publication.id,
+            media_root=get_settings().media_root,
+        )
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        if isinstance(exc, PublicationOutcomeUnknownError):
+            job.attempts = job.max_attempts
+            db.add(job)
+            db.commit()
+        publication_job = db.get(PublicationJob, publication_job_id)
+        if (
+            publication_job
+            and publication_job.status != PublicationStatus.PUBLISHED
+            and not isinstance(exc, PublicationOutcomeUnknownError)
+        ):
+            publication_job.status = PublicationStatus.FAILED
+            publication_job.last_error = str(exc)
+            db.commit()
+        raise
+    finally:
+        publisher.close()
+
+
 HANDLERS: dict[str, Callable] = {
     "FULFILL_ACCESS": _fulfill_access,
     "EXPIRE_ACCESS": _expire_access,
     "ACQUIRE_MEDIA": _acquire_media,
     "UPLOAD_VAULT": _upload_vault,
+    "PUBLISH_CONTENT": _publish_content,
 }
 
 

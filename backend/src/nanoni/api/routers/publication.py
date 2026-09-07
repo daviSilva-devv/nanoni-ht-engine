@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -7,13 +7,12 @@ from sqlalchemy.orm import Session
 from nanoni.core.db import get_db
 from nanoni.core.security import require_admin
 from nanoni.domain.models import (
-    ContentPack,
-    PublicationJob,
     PublicationRule,
     ScheduleWindow,
     TelegramDestination,
     Topic,
 )
+from nanoni.domain.services.publishing import enqueue_publication
 from nanoni.domain.services.scheduler import Window, choose_scheduled_times
 
 router = APIRouter(
@@ -103,21 +102,22 @@ def queue_pack(
     rule_id: str | None = None,
     db: Session = Depends(get_db),
 ):
-    if not db.get(ContentPack, pack_id):
-        raise HTTPException(404, "pack not found")
-    if not db.get(TelegramDestination, destination_id):
-        raise HTTPException(404, "destination not found")
-    if topic_id and not db.get(Topic, topic_id):
-        raise HTTPException(404, "topic not found")
-    job = PublicationJob(
-        pack_id=pack_id,
-        destination_id=destination_id,
-        topic_id=topic_id,
-        rule_id=rule_id,
-        scheduled_for=scheduled_for or datetime.now(UTC),
-        status="SCHEDULED",
-    )
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    return {"id": job.id, "status": job.status, "scheduled_for": job.scheduled_for}
+    try:
+        job, dispatch = enqueue_publication(
+            db,
+            pack_id=pack_id,
+            destination_id=destination_id,
+            scheduled_for=scheduled_for,
+            topic_id=topic_id,
+            rule_id=rule_id,
+        )
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(422, str(exc)) from exc
+    return {
+        "id": job.id,
+        "status": job.status,
+        "scheduled_for": job.scheduled_for,
+        "dispatch_job_id": dispatch.id,
+    }

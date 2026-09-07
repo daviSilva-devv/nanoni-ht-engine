@@ -137,7 +137,7 @@ def create_order(
     return order, payment
 
 
-def _payment_status_from_provider(status: str) -> str:
+def _payment_status_from_provider(status: str) -> str | None:
     normalized = status.upper()
     if normalized in {"CONFIRMED", "PAID", "APPROVED"}:
         return PaymentStatus.CONFIRMED
@@ -145,7 +145,11 @@ def _payment_status_from_provider(status: str) -> str:
         return PaymentStatus.EXPIRED
     if normalized in {"FAILED", "CANCELLED", "REJECTED"}:
         return PaymentStatus.FAILED
-    return PaymentStatus.PENDING
+    if normalized == "REFUNDED":
+        return PaymentStatus.REFUNDED
+    if normalized == "PENDING":
+        return PaymentStatus.PENDING
+    return None
 
 
 def process_payment_event(db: Session, provider_name: str, event: WebhookEvent) -> Payment:
@@ -171,6 +175,18 @@ def process_payment_event(db: Session, provider_name: str, event: WebhookEvent) 
     )
     if not payment:
         raise ValueError("unknown provider charge")
+    order = db.get(Order, payment.order_id)
+    if not order:
+        raise RuntimeError("payment order missing")
+    if event.external_reference is not None and event.external_reference != order.id:
+        raise ValueError("payment external reference does not match order")
+    if event.amount is not None and (event.amount != payment.amount or event.amount != order.total_amount):
+        raise ValueError("payment amount does not match order")
+    if event.currency is not None and (
+        event.currency.upper() != payment.currency.upper()
+        or event.currency.upper() != order.currency.upper()
+    ):
+        raise ValueError("payment currency does not match order")
 
     payment_event = existing_event or PaymentEvent(
         payment_id=payment.id,
@@ -182,15 +198,17 @@ def process_payment_event(db: Session, provider_name: str, event: WebhookEvent) 
     db.add(payment_event)
 
     target = _payment_status_from_provider(event.status)
-    if target != payment.status:
+    if target is not None and target != payment.status:
         ensure_transition(PaymentStatus, payment.status, target)
         payment.status = target
     if target == PaymentStatus.CONFIRMED:
-        payment.confirmed_at = datetime.now(UTC)
-        order = db.get(Order, payment.order_id)
-        if not order:
-            raise RuntimeError("payment order missing")
-        if order.status != OrderStatus.PAID:
+        if payment.confirmed_at is None:
+            payment.confirmed_at = datetime.now(UTC)
+        if order.status not in {
+            OrderStatus.PAID,
+            OrderStatus.ACCESS_PENDING,
+            OrderStatus.FULFILLED,
+        }:
             ensure_transition(OrderStatus, order.status, OrderStatus.PAID)
             order.status = OrderStatus.PAID
             db.add(order)
@@ -203,6 +221,40 @@ def process_payment_event(db: Session, provider_name: str, event: WebhookEvent) 
         lead = db.scalar(select(Lead).where(Lead.customer_id == order.customer_id))
         if lead:
             record_lead_event(db, lead, "PAYMENT_CONFIRMED", payload={"order_id": order.id})
+    elif target == PaymentStatus.EXPIRED and order.status == OrderStatus.PAYMENT_PENDING:
+        ensure_transition(OrderStatus, order.status, OrderStatus.EXPIRED)
+        order.status = OrderStatus.EXPIRED
+        db.add(order)
+    elif target == PaymentStatus.REFUNDED:
+        if order.status != OrderStatus.REFUNDED:
+            ensure_transition(OrderStatus, order.status, OrderStatus.REFUNDED)
+            order.status = OrderStatus.REFUNDED
+            db.add(order)
+        entitlements = list(
+            db.scalars(
+                select(Entitlement)
+                .join(OrderItem, Entitlement.source_order_item_id == OrderItem.id)
+                .where(OrderItem.order_id == order.id)
+            )
+        )
+        for entitlement in entitlements:
+            if entitlement.status in {EntitlementStatus.ACTIVE, EntitlementStatus.SUSPENDED}:
+                ensure_transition(
+                    EntitlementStatus, entitlement.status, EntitlementStatus.REVOKED
+                )
+                entitlement.status = EntitlementStatus.REVOKED
+                db.add(entitlement)
+        enqueue(
+            db,
+            job_type="EXPIRE_ACCESS",
+            payload={"order_id": order.id, "reason": "refund"},
+            idempotency_key=f"revoke-access:{order.id}",
+        )
+    elif event.status.upper() == "CHARGEBACK":
+        if order.status != OrderStatus.REVIEW_REQUIRED:
+            ensure_transition(OrderStatus, order.status, OrderStatus.REVIEW_REQUIRED)
+            order.status = OrderStatus.REVIEW_REQUIRED
+            db.add(order)
     payment_event.processed = True
     db.add(payment_event)
     db.add(payment)

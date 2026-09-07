@@ -22,7 +22,11 @@ TRANSITIONS: Mapping[type, dict[str, set[str]]] = {
             OrderStatus.REVIEW_REQUIRED,
             OrderStatus.REFUNDED,
         },
-        OrderStatus.ACCESS_PENDING: {OrderStatus.FULFILLED, OrderStatus.REVIEW_REQUIRED},
+        OrderStatus.ACCESS_PENDING: {
+            OrderStatus.FULFILLED,
+            OrderStatus.REVIEW_REQUIRED,
+            OrderStatus.REFUNDED,
+        },
         OrderStatus.FULFILLED: {OrderStatus.REFUNDED, OrderStatus.REVIEW_REQUIRED},
         OrderStatus.EXPIRED: {OrderStatus.PAID, OrderStatus.CANCELLED},
         OrderStatus.REVIEW_REQUIRED: {

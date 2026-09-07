@@ -17,6 +17,11 @@ from nanoni.domain.services.commerce import (
     fulfill_order_entitlements,
     process_payment_event,
 )
+from nanoni.integrations.payment.bravopay import (
+    BravoPayConfigurationError,
+    BravoPayProvider,
+    BravoPayWebhookError,
+)
 from nanoni.integrations.payment.mock import MockPaymentProvider
 from nanoni.integrations.payment.registry import get_payment_provider
 
@@ -102,13 +107,34 @@ def fulfill(order_id: str, db: Session = Depends(get_db)):
         raise HTTPException(422, str(exc)) from exc
 
 
+@router.post("/webhooks/bravopay")
+async def bravopay_webhook(request: Request, db: Session = Depends(get_db)):
+    provider = get_payment_provider()
+    if not isinstance(provider, BravoPayProvider):
+        raise HTTPException(404, "BravoPay provider not configured")
+    raw_body = await request.body()
+    try:
+        event = provider.parse_webhook(raw_body, dict(request.headers))
+        payment = process_payment_event(db, provider.name, event)
+        db.commit()
+        return {"accepted": True, "payment_id": payment.id, "status": payment.status}
+    except BravoPayWebhookError as exc:
+        db.rollback()
+        raise HTTPException(401, str(exc)) from exc
+    except BravoPayConfigurationError as exc:
+        db.rollback()
+        raise HTTPException(503, str(exc)) from exc
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(422, str(exc)) from exc
+
+
 @router.post("/webhooks/{provider_name}")
 async def payment_webhook(provider_name: str, request: Request, db: Session = Depends(get_db)):
     provider = get_payment_provider()
     if provider_name != provider.name:
         raise HTTPException(404, "provider not configured")
     payload = await request.json()
-    # Signature verification belongs inside the real provider implementation's parse_webhook contract.
     try:
         event = provider.parse_webhook(payload, dict(request.headers))
         payment = process_payment_event(db, provider.name, event)
@@ -132,13 +158,9 @@ def payment_recheck(payment_id: str, db: Session = Depends(get_db)):
     if payment.provider != provider.name:
         raise HTTPException(409, "payment provider is not currently configured")
     charge = provider.get_charge(payment.provider_charge_id)
-    event = provider.parse_webhook(
-        {
-            "event_id": f"recheck:{payment.id}:{charge.status}",
-            "charge_id": charge.provider_charge_id,
-            "status": charge.status,
-            "event_type": "payment.recheck",
-        }
+    event = provider.event_from_charge(
+        charge,
+        event_id=f"recheck:{payment.id}:{charge.status}",
     )
     updated = process_payment_event(db, provider.name, event)
     db.commit()

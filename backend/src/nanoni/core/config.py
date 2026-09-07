@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     helper_shared_secret: str = "change-me-helper"
     payment_provider: str = "mock"
     external_checkout_base_url: str = "http://localhost:3000/checkout"
+    bravopay_api_base_url: str = "https://bravopay.club/api/v1"
+    bravopay_api_key: str = ""
+    bravopay_webhook_secret: str = ""
+    bravopay_pix_expires_in: int = 3600
     telegram_bot_token: str = ""
     telegram_webhook_secret: str = ""
     telegram_api_base_url: str = "https://api.telegram.org"
@@ -47,6 +51,14 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.env == "prod"
+
+    @model_validator(mode="after")
+    def validate_payment_configuration(self) -> "Settings":
+        if self.payment_provider.lower() == "bravopay" and not self.bravopay_api_key:
+            raise ValueError("NANONI_BRAVOPAY_API_KEY is required for the BravoPay provider")
+        if not 60 <= self.bravopay_pix_expires_in <= 86400:
+            raise ValueError("NANONI_BRAVOPAY_PIX_EXPIRES_IN must be between 60 and 86400")
+        return self
 
 
 @lru_cache

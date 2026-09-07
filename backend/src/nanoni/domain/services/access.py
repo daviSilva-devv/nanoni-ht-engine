@@ -129,7 +129,7 @@ def has_expired_memberships(db: Session) -> bool:
             .join(Entitlement, MembershipGrant.entitlement_id == Entitlement.id)
             .where(
                 MembershipGrant.status == MembershipStatus.ACTIVE,
-                Entitlement.status == EntitlementStatus.EXPIRED,
+                Entitlement.status.in_((EntitlementStatus.EXPIRED, EntitlementStatus.REVOKED)),
             )
             .limit(1)
         )
@@ -148,7 +148,7 @@ def remove_expired_memberships(
             .join(Entitlement, MembershipGrant.entitlement_id == Entitlement.id)
             .where(
                 MembershipGrant.status == MembershipStatus.ACTIVE,
-                Entitlement.status == EntitlementStatus.EXPIRED,
+                Entitlement.status.in_((EntitlementStatus.EXPIRED, EntitlementStatus.REVOKED)),
             )
         )
     )

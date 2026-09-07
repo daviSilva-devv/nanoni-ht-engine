@@ -17,3 +17,13 @@ def test_copy_is_configurable_and_weighted(db):
     db.flush()
     selected = [choose_copy(db, "BOT_HERO", rng=random.Random(seed)).text for seed in range(30)]
     assert selected.count("B") > selected.count("A")
+
+
+def test_copy_from_inactive_slot_is_not_selected(db):
+    slot = CopySlot(key="BOT_HERO", active=False)
+    db.add(slot)
+    db.flush()
+    db.add(CopyVariant(slot_id=slot.id, text="Disabled hero"))
+    db.flush()
+
+    assert choose_copy(db, "BOT_HERO") is None

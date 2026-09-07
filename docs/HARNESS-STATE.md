@@ -1,13 +1,13 @@
-CURRENT_PHASE: 6
+CURRENT_PHASE: 7
 STATUS: GREEN
 AGENT: Codex
-BASE_COMMIT: 473d140
-LAST_GREEN_PHASE: 5
-LAST_GREEN_COMMIT: 473d140
-CURRENT_WORK: Telegram Helper + localhost bridge
+BASE_COMMIT: 369a831
+LAST_GREEN_PHASE: 6
+LAST_GREEN_COMMIT: 369a831
+CURRENT_WORK: Sales Router
 BLOCKERS: none
 BLOCKED_EXTERNAL: none
-NEXT: Consolidate Phase 6, then start Phase 7 Sales Router.
+NEXT: Consolidate Phase 7, then start Phase 8 Payment + Access.
 
 DONE:
 - TelegramMediaGateway: HTTPX streaming upload with progress callback, retry/backoff on 429 + 5xx, honours retry_after.
@@ -52,3 +52,9 @@ IMPORTANT_NOTES:
 - Phase 6 deterministic gate: 77 passed, 1 expected PostgreSQL skip; Ruff, compileall, Alembic check, JS syntax, and MV3 manifest parsing are green.
 - Phase 6 real browser gate GREEN: Telegram Helper created Candidate 2c70e144-8eaa-4920-83be-4664f7fb3bee through the operator-authenticated Telegram Web flow.
 - The real Candidate is backed by the telegram-helper Source, linked to its pack, retains Telegram post context, and contains six persisted media items.
+- Phase 6 was fast-forwarded to main and tagged phase-6-green at 369a831.
+- Phase 7 GREEN: public Sales Router enforces explicit 18+ confirmation, renders configured hero copy/media and configurable VIP/FREE CTA labels, and records lead transitions.
+- A single active product skips product discovery; multiple active products require an explicit choice, and only active plans belonging to the selected product reach CHECKOUT_CHOICE.
+- FREE routing resolves an active FREE destination through its public username or configured invite URL and preserves the lead history.
+- Phase 7 gate reaches checkout choice in four calls from a new lead (start, age confirmation, VIP intent, plan choice), with the product step removed when unambiguous.
+- Phase 7 closure gate: 84 passed, 1 expected PostgreSQL skip; Ruff, compileall, Alembic current, and Alembic check are green.

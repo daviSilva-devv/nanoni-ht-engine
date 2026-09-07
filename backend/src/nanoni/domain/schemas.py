@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -540,6 +540,59 @@ class EntitlementRead(ORMModel):
     starts_at: datetime
     expires_at: datetime | None
     status: str
+
+
+class SalesStartRequest(BaseModel):
+    telegram_user_id: str = Field(min_length=1, max_length=64)
+    username: str | None = Field(default=None, max_length=120)
+    display_name: str | None = Field(default=None, max_length=160)
+
+
+class SalesActionRequest(SalesStartRequest):
+    action: Literal["CONFIRM_AGE", "VIP", "FREE", "PRODUCT", "PLAN"]
+    product_id: str | None = None
+    price_plan_id: str | None = None
+
+
+class SalesButton(BaseModel):
+    label: str
+    action: str
+    product_id: str | None = None
+    price_plan_id: str | None = None
+
+
+class SalesProductChoice(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+
+
+class SalesPlanChoice(BaseModel):
+    id: str
+    kind: str
+    amount: Decimal
+    currency: str
+    duration_days: int | None
+    lifetime: bool
+    featured: bool
+
+
+class SalesCheckoutChoice(BaseModel):
+    price_plan_id: str
+    order_endpoint: str
+
+
+class SalesRouterView(BaseModel):
+    stage: str
+    lead_id: str
+    copy_text: str | None = Field(default=None, serialization_alias="copy")
+    media_asset_id: str | None = None
+    product_id: str | None = None
+    buttons: list[SalesButton] = Field(default_factory=list)
+    products: list[SalesProductChoice] = Field(default_factory=list)
+    plans: list[SalesPlanChoice] = Field(default_factory=list)
+    destination_url: str | None = None
+    checkout: SalesCheckoutChoice | None = None
 
 
 class DashboardSummary(BaseModel):

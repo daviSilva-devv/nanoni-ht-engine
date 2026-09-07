@@ -16,6 +16,7 @@ def choose_copy(
         .join(CopySlot, CopySlot.id == CopyVariant.slot_id)
         .where(
             CopySlot.key == slot_key,
+            CopySlot.active.is_(True),
             CopyVariant.active.is_(True),
             or_(CopyVariant.valid_from.is_(None), CopyVariant.valid_from <= now),
             or_(CopyVariant.valid_to.is_(None), CopyVariant.valid_to >= now),

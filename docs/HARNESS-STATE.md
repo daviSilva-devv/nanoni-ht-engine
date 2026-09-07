@@ -1,13 +1,13 @@
 CURRENT_PHASE: 6
-STATUS: GREEN_DETERMINISTIC
+STATUS: GREEN
 AGENT: Codex
 BASE_COMMIT: 473d140
 LAST_GREEN_PHASE: 5
 LAST_GREEN_COMMIT: 473d140
 CURRENT_WORK: Telegram Helper + localhost bridge
-BLOCKERS: Telegram Web browser gate requires an operator-authenticated tab and extension interaction
-BLOCKED_EXTERNAL: Load the unpacked MV3 extension, open a Telegram Web post, and trigger Send current post to Nanoni.
-NEXT: Run the real browser gate; verify the visible Telegram post becomes the same candidate/pack returned by the helper and any selected local file is linked.
+BLOCKERS: none
+BLOCKED_EXTERNAL: none
+NEXT: Consolidate Phase 6, then start Phase 7 Sales Router.
 
 DONE:
 - TelegramMediaGateway: HTTPX streaming upload with progress callback, retry/backoff on 429 + 5xx, honours retry_after.
@@ -50,3 +50,5 @@ IMPORTANT_NOTES:
 - Optional operator-selected files are streamed into processing and linked to the same candidate; duplicate/replayed files do not create duplicate pack items, and purged assets can be restored.
 - Helper manifest and file endpoints use HMAC authentication; file-link signatures expire after five minutes.
 - Phase 6 deterministic gate: 77 passed, 1 expected PostgreSQL skip; Ruff, compileall, Alembic check, JS syntax, and MV3 manifest parsing are green.
+- Phase 6 real browser gate GREEN: Telegram Helper created Candidate 2c70e144-8eaa-4920-83be-4664f7fb3bee through the operator-authenticated Telegram Web flow.
+- The real Candidate is backed by the telegram-helper Source, linked to its pack, retains Telegram post context, and contains six persisted media items.

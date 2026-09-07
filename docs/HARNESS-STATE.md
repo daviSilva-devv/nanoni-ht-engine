@@ -1,13 +1,13 @@
 CURRENT_PHASE: 8
-STATUS: IN_PROGRESS
+STATUS: BLOCKED_EXTERNAL
 AGENT: Codex
 BASE_COMMIT: 718fee7
 LAST_GREEN_PHASE: 7
 LAST_GREEN_COMMIT: 718fee7
 CURRENT_WORK: Payment + Access
-BLOCKERS: none
-BLOCKED_EXTERNAL: none
-NEXT: Select a production provider approved for the lawful adult/high-risk category, then close external checkout, verified webhook, entitlement, access, expiry, reentry, and replay gates.
+BLOCKERS: Production PIX merchant approval and Telegram payment-mode compliance decision
+BLOCKED_EXTERNAL: Obtain written merchant approval for the fully disclosed lawful adult category and choose either Telegram Stars inside the bot or an independent external PIX storefront where the bot only handles identity/claim/access.
+NEXT: After the external decision, configure the approved provider credentials, HMAC webhook secret, public HTTPS webhook URL, and backend egress-IP whitelist; then implement and run the real small-payment gate.
 
 DONE:
 - TelegramMediaGateway: HTTPX streaming upload with progress callback, retry/backoff on 429 + 5xx, honours retry_after.
@@ -59,3 +59,6 @@ IMPORTANT_NOTES:
 - Phase 7 gate reaches checkout choice in four calls from a new lead (start, age confirmation, VIP intent, plan choice), with the product step removed when unambiguous.
 - Phase 7 closure gate: 84 passed, 1 expected PostgreSQL skip; Ruff, compileall, Alembic current, and Alembic check are green.
 - Phase 7 was fast-forwarded to main and tagged phase-7-green at 718fee7.
+- Phase 8 provider discovery: GGPIXAPI publicly documents adult-content PIX, dynamic PIX creation, transaction status lookup, externalId idempotency, and optional HMAC-SHA256 webhook authentication.
+- No production payment-provider configuration or credentials are present in the process environment or a local .env.
+- Telegram's current official digital-goods policy requires Telegram Stars for sales performed inside bots/mini apps, even when an external website exists; external PIX must therefore remain an independent storefront flow pending explicit compliance approval.

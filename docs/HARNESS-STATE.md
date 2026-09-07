@@ -1,13 +1,13 @@
-CURRENT_PHASE: 5
+CURRENT_PHASE: 6
 STATUS: IN_PROGRESS
 AGENT: Codex
-BASE_COMMIT: 69ca546
-LAST_GREEN_PHASE: 4B
-LAST_GREEN_COMMIT: 69ca546
-CURRENT_WORK: Persisted Scheduler
+BASE_COMMIT: 473d140
+LAST_GREEN_PHASE: 5
+LAST_GREEN_COMMIT: 473d140
+CURRENT_WORK: Telegram Helper + localhost bridge
 BLOCKERS: none
 BLOCKED_EXTERNAL: none
-NEXT: Implement persisted planning with randomized weighted windows, spacing, microniche daily packs, and queue-empty alerts; gate a simulated 24h schedule.
+NEXT: Evolve the MV3 helper and localhost bridge so the current Telegram post context becomes a content candidate with minimal operator work.
 
 DONE:
 - TelegramMediaGateway: HTTPX streaming upload with progress callback, retry/backoff on 429 + 5xx, honours retry_after.
@@ -40,3 +40,8 @@ IMPORTANT_NOTES:
 - Purge is restricted to assets backed by verified VaultObjects and occurs only after confirmed publication persistence; failure paths retain local files.
 - Fresh-database migration gate passed through 45d9ee8b602a; Alembic check found no pending operations.
 - Phase 4B was fast-forwarded to main and tagged phase-4b-green at 69ca546.
+- Phase 5 GREEN: persisted PublicationPlan slots with weighted random windows, configurable spacing, target/microniche inventory selection, and idempotent dispatch creation.
+- Simulated 24h gate produced no duplicate or out-of-window publications and preserved global minimum spacing across topic rules.
+- Empty inventory persists SKIPPED_NO_CONTENT slots and opens one deduplicated queue-empty alert; stock-days endpoint reports remaining eligible packs.
+- Fresh-database migration gate passed through 9af4f0aa31d8; backend gate is 73 passed, 1 expected PostgreSQL skip.
+- Phase 5 was fast-forwarded to main and tagged phase-5-green at 473d140.
